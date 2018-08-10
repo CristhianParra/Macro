@@ -1,111 +1,108 @@
 "use strict";
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-  console.log("INIT");
-  // Use the console to output diagnostic information (console.log) and errors (console.error)
-  // This line of code will only be executed once when your extension is activated
-
-  // The command has been defined in the package.json file
-  // Now provide the implementation of the command with  registerCommand
-  // The commandId parameter must match the command field in package.json
-
-  let recording = false;
   let actions: string[] = [];
 
-  const sayHello = vscode.commands.registerCommand("extension.sayHello", () => {
-    vscode.window.showInformationMessage("Hello World!");
-  });
-  const disposable = vscode.commands.registerTextEditorCommand(
-    "extension.switchRecording",
+  const actionMap = {
+    "cmd+left": "cursorHome",
+    "shift+cmd+right": "cursorEndSelect",
+    "cmd+c": "editor.action.clipboardCopyAction",
+    "cmd+x": "editor.action.clipboardCutAction",
+    "ctrl+n": "cursorDown",
+    "cmd+v": "editor.action.clipboardPasteAction",
+    "cmd+right": "cursorEnd"
+  };
+
+  //cmd+k cmd+c editor.action.addCommentLine
+
+  const switchRecording = vscode.commands.registerTextEditorCommand(
+    "macro.switchRecording",
     () => {
-      console.log("switch recording...");
-      recording = !recording;
-      vscode.commands.executeCommand("setContext", "recordingMacro", recording);
-      if (!recording) {
-        actions.forEach(action => {
-          if (action === "ctrl") {
-            vscode.commands.executeCommand("default:type", { text: "ctrl+q" });
-          } else {
-            vscode.commands.executeCommand("type", { text: action });
-          }
-        });
-        actions = [];
-      }
+      vscode.commands.executeCommand("setContext", "recordingMacro", true);
     }
   );
 
-  const aDisposable = vscode.commands.registerTextEditorCommand(
-    "extension.aPressed",
+  const playRecord = vscode.commands.registerTextEditorCommand(
+    "macro.playRecord",
     () => {
-      console.log("a pressed");
-      vscode.commands.executeCommand("type", { text: "a" });
-      if (recording) {
-        actions.push("a");
-      }
-    }
-  );
-  const qDisposable = vscode.commands.registerTextEditorCommand(
-    "extension.qPressed",
-    () => {
-      console.log("q pressed");
-      vscode.commands.executeCommand("type", { text: "q" });
-      if (recording) {
-        actions.push("q");
-      }
+      actions.forEach(action => {
+        // vscode.commands.executeCommand("type", { text: action });
+        vscode.commands.executeCommand(action);
+      });
+      actions = [];
+      vscode.commands.executeCommand("setContext", "recordingMacro", false);
     }
   );
 
-  const ctrlDisposable = vscode.commands.registerTextEditorCommand(
-    "extension.ctrlQPressed",
-    () => {
-      console.log("ctrl + q");
-      if (recording) {
-        actions.push("ctrl");
-      }
-    }
-  );
-
-  let disposablew = vscode.commands.registerCommand("type", args => {
-    vscode.window.showInformationMessage(JSON.stringify(args, null, 2));
+  const type = vscode.commands.registerCommand("type", args => {
+    console.log(args.text);
     vscode.commands.executeCommand("default:type", {
       text: args.text
     });
   });
 
-  let disposablecs = vscode.commands.registerCommand(
-    "editor.action.clipboardCutAction",
-    args => {
-      if(args && args.fromExtension){
-        console.log('AAAAA')
-      }else {
-        console.log('BBBBB')
-        vscode.commands.executeCommand("editor.action.clipboardCutAction", {
-          fromExtension: "called from ext"
-        });
-      }
-    }
+  objectForEach((keybinding, command) => {
+    const internalCommand = keybindingToCommandName(keybinding);
+    context.subscriptions.push(
+      vscode.commands.registerCommand(internalCommand, _ => {
+        console.log("Fake: " + keybinding);
+        actions.push(command);
+        vscode.commands.executeCommand(command);
+      })
+    );
+  }, actionMap);
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("macro.fakeComment", _ => {
+      console.log("Fake: comment");
+      actions.push("editor.action.addCommentLine");
+      vscode.commands.executeCommand("editor.action.addCommentLine");
+    })
   );
 
-  let disposablece = vscode.commands.registerCommand("compositionEnd", args => {
-    console.log("COMP END", JSON.stringify(args, null, 2));
-  });
+  function keybindingToCommandName(keybinding: string): string {
+    const chunks = keybinding.split("+");
+    const capitalizedChunks = chunks.map(
+      chunk => chunk.charAt(0).toUpperCase() + chunk.slice(1)
+    );
+    const command = capitalizedChunks.join("");
+    return "macro.fake" + command;
+  }
 
-  context.subscriptions.push(disposable);
-  context.subscriptions.push(disposablew);
-  context.subscriptions.push(disposable);
-  context.subscriptions.push(sayHello);
-  context.subscriptions.push(aDisposable);
-  context.subscriptions.push(qDisposable);
-  context.subscriptions.push(ctrlDisposable);
-  context.subscriptions.push(disposablecs);
-  context.subscriptions.push(disposablece);
+  function objectForEach(
+    fn: (key: string, value: any) => void,
+    obj: object
+  ): void {
+    Object.keys(obj).forEach(function(key) {
+      fn(key, obj[key]);
+    });
+  }
+
+  context.subscriptions.push(switchRecording);
+  context.subscriptions.push(playRecord);
+  context.subscriptions.push(type);
 }
 
 // this method is called when your extension is deactivated
 export function deactivate() {}
 //_workbench.captureSyntaxTokens
+// editor.action.defineKeybinding
+// workbench.action.inspectKeyMappings
+// breakpointWidget.action.acceptInput
+// _workbench.captureSyntaxTokens
+// repl.action.acceptInput
+// workbench.action.keybindingsReference
+// workbench.action.inspectContextKeys
+// workbench.action.openRawDefaultSettings
+// workbench.action.openSettings
+// workbench.action.openSettings2
+// workbench.action.openGlobalSettings
+// workbench.action.configureLanguageBasedSettings
+
+//Nope pero util
+// workbench.action.openGlobalKeybindingsFile
+// workbench.action.openSettings
+
+//KEYBINDINGS_EDITOR_COMMAND_DEFINE
+// vscode.workspace.getConfiguration('emmet')

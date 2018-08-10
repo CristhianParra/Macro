@@ -11,36 +11,61 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:extension.switchRecording",
-    "onCommand:extension.sayHello",
-    "onCommand:extension.aPressed",
-    "onCommand:extension.qPressed",
-    "onCommand:extension.ctrlQPressed"
+    "onCommand:macro.switchRecording",
+    "onCommand:macro.fakeCmdLeft",
+    "onCommand:macro.fakeShiftCmdRight",
+    "onCommand:macro.fakeCmdC",
+    "onCommand:macro.fakeCtrlX",
+    "onCommand:macro.fakeCtrlN",
+    "onCommand:macro.fakeCmdV",
+    "onCommand:macro.fakeCmdRight",
+    "onCommand:macro.fakeComment"
   ],
   "main": "./out/extension",
   "contributes": {
     "keybindings": [
       {
-        "command": "extension.switchRecording",
+        "command": "macro.switchRecording",
         "key": "ctrl+shift+m"
       },
       {
-        "command": "extension.sayHello",
-        "key": "ctrl+q"
-      },
-      {
-        "command": "extension.aPressed",
-        "key": "a",
+        "command": "macro.fakeCmdLeft",
+        "key": "cmd+left",
         "when": "recordingMacro"
       },
       {
-        "command": "extension.qPressed",
-        "key": "q",
+        "command": "macro.fakeShiftCmdRight",
+        "key": "shift+cmd+right",
         "when": "recordingMacro"
       },
       {
-        "command": "extension.ctrlQPressed",
-        "key": "ctrl+q",
+        "command": "macro.fakeCmdC",
+        "key": "cmd+c",
+        "when": "recordingMacro"
+      },
+      {
+        "command": "macro.fakeCmdX",
+        "key": "cmd+x",
+        "when": "recordingMacro"
+      },
+      {
+        "command": "macro.fakeCtrlN",
+        "key": "ctrl+n",
+        "when": "recordingMacro"
+      },
+      {
+        "command": "macro.fakeCmdV",
+        "key": "cmd+v",
+        "when": "recordingMacro"
+      },
+      {
+        "command": "macro.fakeCmdRight",
+        "key": "cmd+right",
+        "when": "recordingMacro"
+      },
+      {
+        "command": "macro.fakeComment",
+        "key": "cmd+k cmd+c",
         "when": "recordingMacro"
       }
     ]
