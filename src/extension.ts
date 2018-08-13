@@ -12,6 +12,7 @@ export function activate(context: vscode.ExtensionContext) {
   }> = [];
   let commandBlacklist = ["paste"];
   let macros;
+  let lastCommandType = false;
   readMacros(path).then(definedMacros => {
     macros = definedMacros;
     objectForEach((macro, steps) => {
@@ -31,7 +32,6 @@ export function activate(context: vscode.ExtensionContext) {
   const startRecord = vscode.commands.registerTextEditorCommand(
     "macro.startRecord",
     () => {
-      console.log(vscode.env.appRoot);
       vscode.commands.getCommands(true).then(commands => {
         recording = true;
         vscode.commands.executeCommand(
@@ -63,7 +63,14 @@ export function activate(context: vscode.ExtensionContext) {
       recording = false;
       vscode.commands.executeCommand("setContext", "recordingMacro", recording);
       vscode.window
-        .showInputBox({ prompt: "Ingresa el nombre del comando" })
+        .showInputBox({
+          prompt: "Ingresa el nombre del comando",
+          validateInput: (value: string) => {
+            return macros[value]
+              ? `Macro: "${value}" alredy exists.`
+              : null;
+          }
+        })
         .then(commandName => {
           macros[commandName] = [];
           commands.forEach(command => {
@@ -119,10 +126,17 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   function addCommand(command: string, ...args: any[]) {
-    commands.push({
-      command,
-      args
-    });
+    if (lastCommandType) {
+      commands[commands.length - 1].args[0].text += args[0].text;
+    } else {
+      commands.push({
+        command,
+        args
+      });
+      if (command === "type") {
+        lastCommandType = true;
+      }
+    }
   }
 
   function readMacros(path) {

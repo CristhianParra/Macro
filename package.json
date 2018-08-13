@@ -22,7 +22,8 @@
       },
       {
         "command": "macro.stopRecord",
-        "key": "ctrl+shift+n"
+        "key": "ctrl+shift+n",
+        "when": "recordingMacro"
       },
       {
         "command": "macro.playRecord",

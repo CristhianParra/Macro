@@ -5,3 +5,6 @@ store commands
 type:a + type:b = type:ab
 commando para crwear una macro sin guardarla
 commando para reproducir una macro, listar las creadas
+que pasa si el comando ya existe (el input tiene un validate method)
+update and delete commands
+open current commands definition FILE!
