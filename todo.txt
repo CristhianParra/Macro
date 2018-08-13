@@ -1,0 +1,7 @@
+add blacklist
+add delay of action
+easy keybindigns
+store commands
+type:a + type:b = type:ab
+commando para crwear una macro sin guardarla
+commando para reproducir una macro, listar las creadas

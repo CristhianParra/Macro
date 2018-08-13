@@ -1,73 +1,144 @@
 "use strict";
 import * as vscode from "vscode";
+import * as fs from "fs";
 
 export function activate(context: vscode.ExtensionContext) {
-  let actions: string[] = [];
+  const path = "c:/proyectos/macros.json";
+  let recording = false;
+  let commands: Array<{ command: string; args: any[] }> = [];
+  let cachedCommands: Array<{
+    command: string;
+    disposable: vscode.Disposable;
+  }> = [];
+  let commandBlacklist = ["paste"];
+  let macros;
+  readMacros(path).then(definedMacros => {
+    macros = definedMacros;
+    objectForEach((macro, steps) => {
+      console.log("register: " + `macro.${macro}`);
+      vscode.commands.registerTextEditorCommand(`macro.${macro}`, () => {
+        steps.forEach(command => {
+          if (typeof command === "string") {
+            vscode.commands.executeCommand(command);
+          } else {
+            vscode.commands.executeCommand(command.command, ...command.args);
+          }
+        });
+      });
+    }, definedMacros);
+  });
 
-  const actionMap = {
-    "cmd+left": "cursorHome",
-    "shift+cmd+right": "cursorEndSelect",
-    "cmd+c": "editor.action.clipboardCopyAction",
-    "cmd+x": "editor.action.clipboardCutAction",
-    "ctrl+n": "cursorDown",
-    "cmd+v": "editor.action.clipboardPasteAction",
-    "cmd+right": "cursorEnd"
-  };
-
-  //cmd+k cmd+c editor.action.addCommentLine
-
-  const switchRecording = vscode.commands.registerTextEditorCommand(
-    "macro.switchRecording",
+  const startRecord = vscode.commands.registerTextEditorCommand(
+    "macro.startRecord",
     () => {
-      vscode.commands.executeCommand("setContext", "recordingMacro", true);
+      console.log(vscode.env.appRoot);
+      vscode.commands.getCommands(true).then(commands => {
+        recording = true;
+        vscode.commands.executeCommand(
+          "setContext",
+          "recordingMacro",
+          recording
+        );
+        commands
+          .filter(command => commandBlacklist.indexOf(command) === -1)
+          .forEach(command => {
+            try {
+              const disposable = handleCommand(command);
+              cachedCommands.push({
+                command,
+                disposable
+              });
+            } catch (e) {}
+          });
+      });
+    }
+  );
+
+  const stopRecord = vscode.commands.registerTextEditorCommand(
+    "macro.stopRecord",
+    () => {
+      cachedCommands.forEach(cachedCommand => {
+        cachedCommand.disposable.dispose();
+      });
+      recording = false;
+      vscode.commands.executeCommand("setContext", "recordingMacro", recording);
+      vscode.window
+        .showInputBox({ prompt: "Ingresa el nombre del comando" })
+        .then(commandName => {
+          macros[commandName] = [];
+          commands.forEach(command => {
+            macros[commandName].push(
+              command.args.length ? command : command.command
+            );
+          });
+          updateMacros(macros)
+            .then(() => {
+              vscode.commands.registerTextEditorCommand(
+                `macro.${commandName}`,
+                () => {
+                  commands.forEach(command => {
+                    vscode.commands.executeCommand(
+                      command.command,
+                      ...command.args
+                    );
+                  });
+                }
+              );
+            })
+            .catch(console.log);
+        });
     }
   );
 
   const playRecord = vscode.commands.registerTextEditorCommand(
     "macro.playRecord",
     () => {
-      actions.forEach(action => {
-        // vscode.commands.executeCommand("type", { text: action });
-        vscode.commands.executeCommand(action);
+      vscode.window.showQuickPick(Object.keys(macros)).then(command => {
+        macros[command].forEach(command => {
+          if (typeof command === "string") {
+            vscode.commands.executeCommand(command);
+          } else {
+            vscode.commands.executeCommand(command.command, ...command.args);
+          }
+        });
       });
-      actions = [];
-      vscode.commands.executeCommand("setContext", "recordingMacro", false);
     }
   );
 
-  const type = vscode.commands.registerCommand("type", args => {
-    console.log(args.text);
-    vscode.commands.executeCommand("default:type", {
-      text: args.text
+  function handleCommand(command: string): vscode.Disposable {
+    const handledCommand = vscode.commands.registerCommand(
+      command,
+      (...args) => {
+        addCommand(command, ...args);
+        handledCommand.dispose();
+        vscode.commands.executeCommand(command, ...args);
+        cachedCommands.push({ command, disposable: handleCommand(command) });
+      }
+    );
+    return handledCommand;
+  }
+
+  function addCommand(command: string, ...args: any[]) {
+    commands.push({
+      command,
+      args
     });
-  });
+  }
 
-  objectForEach((keybinding, command) => {
-    const internalCommand = keybindingToCommandName(keybinding);
-    context.subscriptions.push(
-      vscode.commands.registerCommand(internalCommand, _ => {
-        console.log("Fake: " + keybinding);
-        actions.push(command);
-        vscode.commands.executeCommand(command);
-      })
-    );
-  }, actionMap);
+  function readMacros(path) {
+    return new Promise(resolve => {
+      fs.readFile(path, (err, data) => {
+        resolve(err ? {} : JSON.parse(data.toString()));
+      });
+    });
+  }
 
-  context.subscriptions.push(
-    vscode.commands.registerCommand("macro.fakeComment", _ => {
-      console.log("Fake: comment");
-      actions.push("editor.action.addCommentLine");
-      vscode.commands.executeCommand("editor.action.addCommentLine");
-    })
-  );
-
-  function keybindingToCommandName(keybinding: string): string {
-    const chunks = keybinding.split("+");
-    const capitalizedChunks = chunks.map(
-      chunk => chunk.charAt(0).toUpperCase() + chunk.slice(1)
-    );
-    const command = capitalizedChunks.join("");
-    return "macro.fake" + command;
+  function updateMacros(macros: object) {
+    return new Promise((resolve, reject) => {
+      fs.writeFile(path, JSON.stringify(macros, null, 2), err => {
+        return err ? reject(err) : resolve();
+      });
+    });
   }
 
   function objectForEach(
@@ -79,30 +150,9 @@ export function activate(context: vscode.ExtensionContext) {
     });
   }
 
-  context.subscriptions.push(switchRecording);
+  context.subscriptions.push(startRecord);
+  context.subscriptions.push(stopRecord);
   context.subscriptions.push(playRecord);
-  context.subscriptions.push(type);
 }
 
-// this method is called when your extension is deactivated
 export function deactivate() {}
-//_workbench.captureSyntaxTokens
-// editor.action.defineKeybinding
-// workbench.action.inspectKeyMappings
-// breakpointWidget.action.acceptInput
-// _workbench.captureSyntaxTokens
-// repl.action.acceptInput
-// workbench.action.keybindingsReference
-// workbench.action.inspectContextKeys
-// workbench.action.openRawDefaultSettings
-// workbench.action.openSettings
-// workbench.action.openSettings2
-// workbench.action.openGlobalSettings
-// workbench.action.configureLanguageBasedSettings
-
-//Nope pero util
-// workbench.action.openGlobalKeybindingsFile
-// workbench.action.openSettings
-
-//KEYBINDINGS_EDITOR_COMMAND_DEFINE
-// vscode.workspace.getConfiguration('emmet')
